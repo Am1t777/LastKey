@@ -246,6 +246,60 @@ Beneficiary retrieves the secret:
 
 The server never holds plaintext secrets or unencrypted AES keys. Only beneficiaries have their RSA private keys.
 
+An additional `owner_encrypted_key` is stored per secret (AES key encrypted with the owner's Argon2id-derived password key), allowing post-creation beneficiary assignment without breaking zero-knowledge — the server only touches the key in RAM for milliseconds.
+
+---
+
+## Secrets API (Step 5)
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/secrets` | Create a new secret (accepts `beneficiary_ids` for at-creation assignment) |
+| GET | `/api/secrets` | List all secrets (metadata only, paginated) |
+| GET | `/api/secrets/{id}` | Get one secret (encrypted blob) |
+| PUT | `/api/secrets/{id}` | Update title / content / type |
+| DELETE | `/api/secrets/{id}` | Delete secret + all its assignments |
+| POST | `/api/secrets/{id}/assign` | Assign to a new beneficiary post-creation |
+
+### Create request shape
+```json
+{
+  "title": "Gmail",
+  "content": "hunter2",
+  "secret_type": "password",
+  "password": "your_account_password",
+  "beneficiary_ids": [1, 2]
+}
+```
+
+`password` is used to derive an Argon2id key that encrypts the secret's AES key for the owner. Never stored in plaintext.
+
+GET responses return encrypted blobs only — no server-side decryption.
+
+---
+
+## Beneficiaries API (Step 6)
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/beneficiaries` | Add a beneficiary |
+| GET | `/api/beneficiaries` | List all beneficiaries |
+| GET | `/api/beneficiaries/{id}` | Get one beneficiary |
+| PATCH | `/api/beneficiaries/{id}` | Update name or email |
+| DELETE | `/api/beneficiaries/{id}` | Delete beneficiary + assignments |
+| POST | `/api/beneficiaries/{id}/generate-key` | Generate RSA-2048 keypair (returns private key once) |
+| GET | `/api/beneficiaries/{id}/secrets` | List secrets assigned to this beneficiary |
+
+### RSA key generation flow
+1. Owner calls `POST /api/beneficiaries/{id}/generate-key`
+2. Server generates RSA-2048 keypair — public key stored in DB, private key returned in response body
+3. Owner delivers private key to beneficiary manually (copy-paste, printed, etc.)
+4. Key rotation is not supported — delete and recreate the beneficiary to reset
+
 ---
 
 ## API Endpoints (planned)
@@ -268,8 +322,8 @@ The server never holds plaintext secrets or unencrypted AES keys. Only beneficia
 - [x] Step 2 — Database models: all 6 tables with relationships
 - [x] Step 3 — Authentication: register, login, JWT, bcrypt
 - [x] Step 4 — Encryption service: AES-256-GCM + RSA-2048
-- [ ] Step 5 — Secrets API: CRUD
-- [ ] Step 6 — Beneficiaries API
+- [x] Step 5 — Secrets API: CRUD
+- [x] Step 6 — Beneficiaries API
 - [ ] Step 7 — Trusted verifier API
 - [ ] Step 8 — Dead man's switch (APScheduler)
 - [ ] Step 9 — Secret release flow

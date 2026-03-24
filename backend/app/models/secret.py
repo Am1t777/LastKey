@@ -24,6 +24,7 @@ class Secret(Base):
     encryption_iv = Column(String, nullable=False)     # GCM nonce (base64)
     encryption_tag = Column(String, nullable=False)    # GCM auth tag (base64)
     secret_type = Column(Enum(SecretType), nullable=False, default=SecretType.note)
+    owner_encrypted_key = Column(Text, nullable=False)  # AES key encrypted with Argon2id(owner password), format: salt_b64:ct_b64:iv_b64:tag_b64
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
