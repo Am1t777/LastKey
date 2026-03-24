@@ -1,7 +1,5 @@
 # LastKey — Digital Inheritance Vault
 
-A portfolio project for junior software engineering interviews.
-
 LastKey lets users securely store encrypted secrets (passwords, documents, notes) that are automatically released to designated beneficiaries after the user's death or incapacitation — verified through a trusted person acting as a "dead man's switch".
 
 ---
@@ -189,6 +187,35 @@ npm start
 
 ---
 
+## Authentication (Step 3)
+
+The auth system uses **JWT tokens** (HS256) and **bcrypt** password hashing.
+
+### How it works
+
+1. **Register** — `POST /api/auth/register` with `{email, password, name}`. Password must be at least 8 characters. Returns a JWT token immediately (user is logged in after registration).
+2. **Login** — `POST /api/auth/login` with `{email, password}`. Returns a JWT token. Uses a generic error message ("Invalid email or password") to prevent user enumeration.
+3. **Access protected routes** — Include the token in the `Authorization: Bearer <token>` header.
+4. **Get current user** — `GET /api/auth/me` returns the authenticated user's profile.
+5. **Logout** — `POST /api/auth/logout`. Since JWTs are stateless, this logs the action and returns a success message.
+
+### Files
+
+| File | Purpose |
+|---|---|
+| `backend/app/schemas/auth.py` | Pydantic request/response models (UserRegister, UserLogin, TokenResponse, etc.) |
+| `backend/app/services/auth_service.py` | Password hashing, JWT creation/validation, `get_current_user` dependency, audit logger |
+| `backend/app/routers/auth.py` | Four auth endpoints under `/api/auth` |
+
+### Key design decisions
+
+- **`get_current_user` dependency** — reusable FastAPI dependency that all protected routes will use via `Depends(get_current_user)`
+- **`log_audit` helper** — reusable function for audit logging across all routers
+- **Stateless logout** — no token blocklist needed for a portfolio project; JWT simply expires after 30 minutes
+- **Audit trail** — register, login, and logout actions are logged with user ID and IP address
+
+---
+
 ## API Endpoints (planned)
 
 | Group | Prefix | Description |
@@ -207,7 +234,7 @@ npm start
 
 - [x] Step 1 — Project setup: FastAPI scaffold, SQLite, config, health endpoint
 - [x] Step 2 — Database models: all 6 tables with relationships
-- [ ] Step 3 — Authentication: register, login, JWT, bcrypt
+- [x] Step 3 — Authentication: register, login, JWT, bcrypt
 - [ ] Step 4 — Encryption service: AES-256-GCM + RSA-2048
 - [ ] Step 5 — Secrets API: CRUD
 - [ ] Step 6 — Beneficiaries API

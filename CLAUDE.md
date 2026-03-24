@@ -100,3 +100,8 @@ npm start                             # Dev server on :3000
 
 ## Full Spec
 See [crispy-bouncing-codd.md](crispy-bouncing-codd.md) for the complete project specification.
+
+## ddocumentation
+document every step in a README file.
+explain whats happening in the project.
+
