@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import Base, engine
+import app.models  # noqa: F401 — ensures all models are registered before create_all
 
 # Create all tables on startup (development convenience)
 Base.metadata.create_all(bind=engine)
