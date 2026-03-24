@@ -216,6 +216,38 @@ The auth system uses **JWT tokens** (HS256) and **bcrypt** password hashing.
 
 ---
 
+## Encryption Service (Step 4)
+
+All encryption logic lives in `backend/app/services/encryption_service.py`. It is a pure module — no DB access, no FastAPI dependencies, just crypto functions used by Steps 5–9.
+
+### Functions
+
+| Function | Description |
+|---|---|
+| `generate_aes_key()` | Returns 32 random bytes (AES-256 key) |
+| `encrypt_content(plaintext, key)` | AES-256-GCM encrypt → `(ciphertext_b64, iv_b64, tag_b64)` |
+| `decrypt_content(ct_b64, key, iv_b64, tag_b64)` | AES-256-GCM decrypt → plaintext string |
+| `generate_rsa_keypair()` | RSA-2048 → `(public_pem, private_pem)` |
+| `encrypt_key_for_beneficiary(aes_key, public_pem)` | RSA-OAEP encrypt AES key → base64 string |
+| `decrypt_key_as_beneficiary(enc_key_b64, private_pem)` | RSA-OAEP decrypt → raw AES key bytes |
+| `derive_key(password, salt)` | Argon2id (time=3, mem=64MB, p=4) → 32-byte key |
+
+### How the zero-knowledge flow works
+
+```
+User creates a secret:
+  plaintext → AES-256-GCM(key) → encrypted_content + iv + tag  (stored in secrets table)
+  aes_key   → RSA-OAEP(beneficiary.public_key) → encrypted_key (stored in secret_assignments)
+
+Beneficiary retrieves the secret:
+  encrypted_key → RSA-OAEP decrypt(beneficiary.private_key) → aes_key
+  encrypted_content → AES-256-GCM decrypt(aes_key, iv, tag) → plaintext
+```
+
+The server never holds plaintext secrets or unencrypted AES keys. Only beneficiaries have their RSA private keys.
+
+---
+
 ## API Endpoints (planned)
 
 | Group | Prefix | Description |
@@ -235,7 +267,7 @@ The auth system uses **JWT tokens** (HS256) and **bcrypt** password hashing.
 - [x] Step 1 — Project setup: FastAPI scaffold, SQLite, config, health endpoint
 - [x] Step 2 — Database models: all 6 tables with relationships
 - [x] Step 3 — Authentication: register, login, JWT, bcrypt
-- [ ] Step 4 — Encryption service: AES-256-GCM + RSA-2048
+- [x] Step 4 — Encryption service: AES-256-GCM + RSA-2048
 - [ ] Step 5 — Secrets API: CRUD
 - [ ] Step 6 — Beneficiaries API
 - [ ] Step 7 — Trusted verifier API
