@@ -1,4 +1,4 @@
-import * as argon2 from 'argon2-browser'
+import { argon2id } from '@noble/hashes/argon2.js'
 
 function base64ToBytes(b64) {
   const bin = atob(b64)
@@ -21,9 +21,9 @@ function pemToBuffer(pem) {
 
 export async function decryptSecretAsOwner(password, ownerEncryptedKey, encContent, encIv, encTag) {
   const [salt_b64, ct_b64, iv_b64, tag_b64] = ownerEncryptedKey.split(':', 4)
-  const { hash } = await argon2.hash({
-    pass: password, salt: base64ToBytes(salt_b64),
-    time: 3, mem: 65536, parallelism: 4, hashLen: 32, type: argon2.ArgonType.Argon2id,
+  // Argon2id params match backend encryption_service.py: t=3, m=65536, p=4, dkLen=32
+  const hash = argon2id(new TextEncoder().encode(password), base64ToBytes(salt_b64), {
+    t: 3, m: 65536, p: 4, dkLen: 32,
   })
   const ownerKey = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['decrypt'])
   const aesKeyB64Bytes = await crypto.subtle.decrypt(
