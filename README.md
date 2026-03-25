@@ -497,5 +497,60 @@ Applied to every response by `SecurityHeadersMiddleware`:
 - [x] Step 8 — Dead man's switch (APScheduler)
 - [x] Step 9 — Secret release flow
 - [x] Step 10 — Security middleware
-- [ ] Step 11 — React frontend
+- [x] Step 11 — React frontend
 - [ ] Step 12 — Testing + polish
+
+---
+
+## Step 11 — React Frontend
+
+The frontend is a React SPA built with Vite 5.
+
+### Tech Stack
+- **Vite 5** — fast dev server and build tool
+- **React Router v6** — client-side routing
+- **TanStack Query v5** — server state management (caching, refetching)
+- **axios** — HTTP client with JWT auth interceptor and CSRF header
+- **Tailwind CSS v3** — utility-first CSS with CSS variables for theming
+- **Radix UI** — accessible headless UI primitives (Dialog, Select, etc.)
+- **argon2-browser** — WebAssembly Argon2id (matches backend params exactly)
+- **Web Crypto API** — native browser AES-256-GCM and RSA-OAEP decryption
+
+### Running the Frontend
+```bash
+cd frontend
+npm install
+npm run dev   # dev server at http://localhost:3000
+```
+
+### Key Pages
+| Route | Description |
+|-------|-------------|
+| `/login`, `/register` | Authentication |
+| `/dashboard` | Switch status badge, next check-in date, quick check-in button |
+| `/secrets` | List, create, view, decrypt (as owner), assign to beneficiaries |
+| `/beneficiaries` | List, create, generate RSA-2048 key pair |
+| `/verifier` | Set / update / remove trusted verifier |
+| `/settings` | Update check-in interval |
+
+### Public Pages (no login required)
+| Route | Description |
+|-------|-------------|
+| `/checkin?token=...` | One-click check-in from email link |
+| `/verify/:token/confirm` | Verifier confirms death — type person's name |
+| `/verify/:token/deny` | Verifier denies (person is alive) — resets timer |
+| `/release/:token` | Beneficiary pastes private key to decrypt inherited secrets |
+
+### Zero-Knowledge Decryption
+All decryption happens **client-side only** — the server never sees plaintext.
+
+**Owner decryption flow:**
+1. User enters their encryption password
+2. Browser runs Argon2id with the stored salt (same params as Python backend)
+3. AES-256-GCM decrypts the wrapped AES key stored in `owner_encrypted_key`
+4. That AES key decrypts the secret content
+
+**Beneficiary decryption flow:**
+1. Beneficiary pastes their RSA-2048 private key (PEM / PKCS8 format)
+2. RSA-OAEP (SHA-256) decrypts the wrapped AES key from `encrypted_key`
+3. AES-256-GCM decrypts the secret content

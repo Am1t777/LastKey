@@ -15,6 +15,7 @@ from app.routers.beneficiaries import router as beneficiaries_router
 from app.routers.checkin import router as checkin_router
 from app.routers.release import router as release_router
 from app.routers.secrets import router as secrets_router
+from app.routers.settings import router as settings_router
 from app.routers.verifier import public_verify_router, router as verifier_router
 from app.services.scheduler import run_checkin_job, scheduler
 import app.models  # noqa: F401 — ensures all models are registered before create_all
@@ -61,6 +62,7 @@ app.include_router(verifier_router)
 app.include_router(public_verify_router)
 app.include_router(checkin_router)
 app.include_router(release_router)
+app.include_router(settings_router)
 
 
 @app.get("/health")

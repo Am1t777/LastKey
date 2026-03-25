@@ -32,6 +32,7 @@ class SecretResponse(BaseModel):
     encrypted_content: str
     encryption_iv: str
     encryption_tag: str
+    owner_encrypted_key: str
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -51,3 +52,4 @@ class SecretListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    has_more: bool = False

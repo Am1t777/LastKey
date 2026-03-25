@@ -19,7 +19,9 @@ class UserResponse(BaseModel):
     email: str
     name: str
     check_in_interval_days: int
+    last_check_in_at: datetime
     is_active: bool
+    switch_status: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
