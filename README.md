@@ -316,6 +316,75 @@ GET responses return encrypted blobs only — no server-side decryption.
 
 ---
 
+## Trusted Verifier API (Step 7)
+
+Each user may designate one trusted verifier (friend, doctor, lawyer) who can confirm death or incapacitation. The server generates two cryptographically random tokens per verifier — one for confirmation, one for denial — stored only in the DB and sent only via email links. Tokens are never exposed in any API response.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/verifier` | Bearer | Set or silently replace the trusted verifier (upserts, regenerates tokens) |
+| GET | `/api/verifier` | Bearer | Get current verifier |
+| DELETE | `/api/verifier` | Bearer | Remove verifier |
+| POST | `/api/verify/{token}/confirm` | None | Verifier confirms — must type user's full name to confirm |
+| POST | `/api/verify/{token}/deny` | None | Verifier denies — resets the dead man's switch timer |
+
+### Confirm flow
+The verifier must submit `{"confirmation_text": "<user's full name>"}`. The name is compared case-insensitively. This prevents accidental one-click confirmation. If `switch_status != verifier_alerted`, both endpoints return `400` — preventing stale email links from taking effect.
+
+---
+
+## Dead Man's Switch (Step 8)
+
+### State machine
+
+```
+[active]
+   │ scheduler: deadline passed
+   ▼
+[reminder_sent] ◄──────────────────────────────────────────┐
+   │ scheduler: +7 days grace period ends                  │
+   ▼                                                       │
+[verifier_alerted]                                         │
+   │              │                                        │
+   │ /confirm     │ /deny                                  │
+   ▼              ▼                                        │
+[released]      [active] (last_check_in_at = now) ─────────┘
+```
+
+Any check-in at any stage resets to `[active]`.
+
+### Scheduler
+
+APScheduler (`AsyncIOScheduler`) runs a daily cron job at 02:00 UTC. It processes every active user:
+- **Overdue but in grace period** → sends one reminder email with a magic check-in link → `switch_status = reminder_sent`
+- **Grace period expired, no verifier** → sends urgent warning email to the user
+- **Grace period expired, verifier exists** → refreshes tokens, emails verifier with Confirm / Deny buttons → `switch_status = verifier_alerted`
+
+The scheduler starts automatically via FastAPI's `lifespan` context manager and shuts down cleanly on server stop.
+
+### Check-in endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/checkin` | None | Token-based (magic link from email) — body: `{"token": "..."}` |
+| POST | `/api/checkin/auth` | Bearer | JWT-authenticated (dashboard button) |
+
+Both reset `last_check_in_at`, clear all state fields, and return `{"message": "...", "next_checkin_due": "..."}`.
+
+### New User fields
+
+| Field | Type | Description |
+|---|---|---|
+| `switch_status` | enum | `active / reminder_sent / verifier_alerted / released` |
+| `reminder_sent_at` | datetime | When the reminder email was sent |
+| `verifier_contacted_at` | datetime | When the verifier was emailed |
+| `checkin_token` | string | One-time magic-link token for email check-in |
+| `checkin_token_expires_at` | datetime | Token expiry (30 days from issuance) |
+
+---
+
 ## Implementation Progress
 
 - [x] Step 1 — Project setup: FastAPI scaffold, SQLite, config, health endpoint
@@ -324,8 +393,8 @@ GET responses return encrypted blobs only — no server-side decryption.
 - [x] Step 4 — Encryption service: AES-256-GCM + RSA-2048
 - [x] Step 5 — Secrets API: CRUD
 - [x] Step 6 — Beneficiaries API
-- [ ] Step 7 — Trusted verifier API
-- [ ] Step 8 — Dead man's switch (APScheduler)
+- [x] Step 7 — Trusted verifier API
+- [x] Step 8 — Dead man's switch (APScheduler)
 - [ ] Step 9 — Secret release flow
 - [ ] Step 10 — Security middleware
 - [ ] Step 11 — React frontend
