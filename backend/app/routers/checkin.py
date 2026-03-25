@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import SwitchStatus, User
 from app.schemas.checkin import CheckinResponse, CheckinTokenRequest
+from app.middleware.rate_limit import limiter
 from app.services.auth_service import get_current_user, log_audit
 
 router = APIRouter(prefix="/api/checkin", tags=["Check-in"])
@@ -25,6 +26,7 @@ def _do_checkin(user: User, db: Session, request: Request) -> CheckinResponse:
 
 
 @router.post("", response_model=CheckinResponse)
+@limiter.limit("20/minute")
 def checkin_by_token(
     body: CheckinTokenRequest,
     request: Request,

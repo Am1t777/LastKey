@@ -30,3 +30,4 @@ class User(Base):
     verifier_contacted_at = Column(DateTime, nullable=True)
     checkin_token = Column(String, unique=True, nullable=True)
     checkin_token_expires_at = Column(DateTime, nullable=True)
+    released_at = Column(DateTime, nullable=True)

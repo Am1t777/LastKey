@@ -76,6 +76,35 @@ def send_verifier_alert(
     send_email(verifier_email, f"LastKey — Verification needed for {user_name}", html)
 
 
+def send_beneficiary_release(
+    beneficiary_name: str,
+    beneficiary_email: str,
+    deceased_name: str,
+    retrieval_url: str,
+    secret_count: int,
+) -> None:
+    html = _layout(f"""
+<h2 style="color:#dc2626;">Important notice regarding {deceased_name}</h2>
+<p style="color:#475569;">Hello {beneficiary_name},</p>
+<p style="color:#475569;">
+  We are sorry to inform you that <strong>{deceased_name}</strong> has passed away or become incapacitated.
+  They designated you as a beneficiary on LastKey — Digital Inheritance Vault.
+</p>
+<p style="color:#475569;">
+  <strong>{secret_count}</strong> secret(s) have been released to you. Click the button below to access them.
+</p>
+<p style="margin:28px 0;">{_btn(retrieval_url, "Access My Secrets", "#dc2626")}</p>
+<p style="color:#94a3b8;font-size:13px;">
+  If the button does not work, copy and paste this link into your browser:<br>
+  <a href="{retrieval_url}" style="color:#94a3b8;">{retrieval_url}</a>
+</p>
+<p style="color:#94a3b8;font-size:13px;">
+  This link will expire in 90 days. Please save the contents securely before then.
+</p>
+""")
+    send_email(beneficiary_email, f"LastKey — {deceased_name} has designated you as a beneficiary", html)
+
+
 def send_no_verifier_warning(user_name: str, user_email: str) -> None:
     html = _layout(f"""
 <h2 style="color:#dc2626;">Action required: No trusted verifier set</h2>

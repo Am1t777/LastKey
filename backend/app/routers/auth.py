@@ -12,6 +12,7 @@ from app.schemas.auth import (
     UserRegister,
     UserResponse,
 )
+from app.middleware.rate_limit import limiter
 from app.services.auth_service import (
     create_access_token,
     get_current_user,
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 def register(body: UserRegister, request: Request, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == body.email).first()
     if existing:
@@ -49,6 +51,7 @@ def register(body: UserRegister, request: Request, db: Session = Depends(get_db)
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 def login(body: UserLogin, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.password_hash):

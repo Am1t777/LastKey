@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.middleware.rate_limit import limiter
 from app.models.trusted_verifier import TrustedVerifier
 from app.models.user import SwitchStatus, User
 from app.schemas.auth import MessageResponse
@@ -15,6 +16,7 @@ from app.schemas.verifier import (
     VerifierResponse,
 )
 from app.services.auth_service import get_current_user, log_audit
+from app.services.release_service import trigger_release
 
 router = APIRouter(prefix="/api/verifier", tags=["Verifier"])
 public_verify_router = APIRouter(prefix="/api/verify", tags=["Verify"])
@@ -97,6 +99,7 @@ def delete_verifier(
 # ── Public: confirm / deny ────────────────────────────────────────────────────
 
 @public_verify_router.post("/{token}/confirm", response_model=VerifierActionResponse)
+@limiter.limit("10/minute")
 def confirm_death(
     token: str,
     body: VerifierConfirmRequest,
@@ -125,7 +128,7 @@ def confirm_death(
     db.commit()
 
     log_audit(db, user.id, "verifier.confirmed", details=v.email, ip_address=request.client.host)
-    # Step 9 will hook into this point to trigger the secret release flow.
+    trigger_release(db=db, user=user, ip_address=request.client.host)
     return VerifierActionResponse(
         message="Thank you. The account has been marked as incapacitated. Beneficiaries will be notified.",
         action="confirmed",
@@ -133,6 +136,7 @@ def confirm_death(
 
 
 @public_verify_router.post("/{token}/deny", response_model=VerifierActionResponse)
+@limiter.limit("10/minute")
 def deny_death(
     token: str,
     request: Request,

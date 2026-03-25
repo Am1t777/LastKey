@@ -385,6 +385,106 @@ Both reset `last_check_in_at`, clear all state fields, and return `{"message": "
 
 ---
 
+## Secret Release Flow (Step 9)
+
+When a trusted verifier confirms death, the system automatically releases all secrets to their designated beneficiaries.
+
+### Flow
+
+1. Verifier calls `POST /api/verify/{token}/confirm` with the deceased's name
+2. `switch_status` → `released`, `released_at` timestamp set
+3. For each beneficiary who has assigned secrets:
+   - A unique 90-day release token is generated and stored
+   - A notification email is sent with an "Access My Secrets" button
+   - Audit entries logged per beneficiary
+4. Beneficiary visits `{FRONTEND_URL}/release/{token}` → frontend calls `GET /api/release/{token}`
+5. Server returns all encrypted blobs — beneficiary decrypts client-side with their RSA private key
+
+### Retrieval endpoint
+
+`GET /api/release/{token}` — no auth required, token is the credential:
+
+```json
+{
+  "deceased_name": "John Smith",
+  "beneficiary_name": "Alice Smith",
+  "released_at": "2026-03-25T10:00:00",
+  "secrets": [
+    {
+      "title": "Gmail",
+      "secret_type": "password",
+      "encrypted_content": "<base64>",
+      "encryption_iv": "<base64>",
+      "encryption_tag": "<base64>",
+      "encrypted_key": "<base64 AES key encrypted with beneficiary's RSA public key>"
+    }
+  ]
+}
+```
+
+The server never decrypts anything — zero-knowledge is maintained.
+
+### New fields
+
+| Table | Field | Description |
+|---|---|---|
+| `beneficiaries` | `release_token` | Unique 90-day token sent in release email |
+| `beneficiaries` | `release_token_expires_at` | Token expiry datetime |
+| `users` | `released_at` | When the release was triggered |
+
+### Audit log actions
+
+| Action | Trigger |
+|---|---|
+| `release.triggered` | Summary entry (beneficiary count) |
+| `release.notified` | Per-beneficiary email sent successfully |
+| `release.email_failed` | Per-beneficiary SMTP failure (silent, logged only) |
+| `release.accessed` | `GET /api/release/{token}` called |
+
+---
+
+## Security Middleware (Step 10)
+
+### Rate limiting (slowapi)
+
+| Endpoint | Limit |
+|---|---|
+| `POST /api/auth/register` | 5/minute per IP |
+| `POST /api/auth/login` | 5/minute per IP |
+| `POST /api/checkin` | 20/minute per IP |
+| `POST /api/verify/{token}/confirm` | 10/minute per IP |
+| `POST /api/verify/{token}/deny` | 10/minute per IP |
+
+Returns `429 Too Many Requests` when exceeded. Uses in-memory storage (single-worker dev/demo).
+
+### CSRF protection
+
+`X-Requested-With` header required on all `POST/PUT/PATCH/DELETE` requests to `/api/*`. Returns `403` if missing.
+
+Exempt paths (called from email links, no JS available):
+- `POST /api/checkin` — magic-link check-in
+- `POST /api/verify/{token}/confirm` and `/deny` — verifier confirmation
+
+### Security response headers
+
+Applied to every response by `SecurityHeadersMiddleware`:
+
+| Header | Value |
+|---|---|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` (relaxed for `/docs`) |
+
+### Other hardening
+
+- CORS `allow_headers` tightened to `Authorization, Content-Type, X-Requested-With`
+- `/docs` and `/redoc` disabled when `APP_ENV=production`
+
+---
+
 ## Implementation Progress
 
 - [x] Step 1 — Project setup: FastAPI scaffold, SQLite, config, health endpoint
@@ -395,7 +495,7 @@ Both reset `last_check_in_at`, clear all state fields, and return `{"message": "
 - [x] Step 6 — Beneficiaries API
 - [x] Step 7 — Trusted verifier API
 - [x] Step 8 — Dead man's switch (APScheduler)
-- [ ] Step 9 — Secret release flow
-- [ ] Step 10 — Security middleware
+- [x] Step 9 — Secret release flow
+- [x] Step 10 — Security middleware
 - [ ] Step 11 — React frontend
 - [ ] Step 12 — Testing + polish
