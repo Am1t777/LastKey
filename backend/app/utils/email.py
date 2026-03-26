@@ -1,25 +1,41 @@
+# smtplib provides a Python SMTP client for sending email over the network
 import smtplib
+# MIMEMultipart and MIMEText build the MIME email message structure
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+# App settings for SMTP credentials and the From address
 from app.config import settings
 
 
+# send_email is the low-level SMTP delivery function used by all template helpers below
 def send_email(to: str, subject: str, html: str) -> None:
+    # Create an "alternative" MIME message — allows clients to render HTML or plain text
     msg = MIMEMultipart("alternative")
+    # Set the email subject line
     msg["Subject"] = subject
+    # Set the sending address from config
     msg["From"] = settings.EMAIL_FROM
+    # Set the recipient address
     msg["To"] = to
+    # Attach the HTML body — "html" tells the mail client to render it as markup
     msg.attach(MIMEText(html, "html"))
 
+    # Open a new SMTP connection to the configured mail server
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        # ehlo() introduces the client to the server (required before STARTTLS)
         server.ehlo()
+        # Upgrade the connection to TLS for encrypted transport
         server.starttls()
+        # Only authenticate if SMTP credentials are configured (allows unauthenticated relay in dev)
         if settings.SMTP_USER:
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        # Send the email — from_addr and to_addrs control SMTP envelope; msg provides headers + body
         server.sendmail(settings.EMAIL_FROM, to, msg.as_string())
 
 
+# _btn is a helper that renders an HTML button/link for use in email templates
+# Returns a raw HTML <a> tag styled as a colored button
 def _btn(url: str, label: str, color: str = "#2563eb") -> str:
     return (
         f'<a href="{url}" style="display:inline-block;padding:12px 24px;'
@@ -28,6 +44,7 @@ def _btn(url: str, label: str, color: str = "#2563eb") -> str:
     )
 
 
+# _layout wraps an email body in a consistent HTML shell with white card on grey background
 def _layout(body: str) -> str:
     return f"""<!DOCTYPE html>
 <html><body style="font-family:sans-serif;background:#f4f4f4;padding:32px;">
@@ -38,6 +55,8 @@ def _layout(body: str) -> str:
 </div></body></html>"""
 
 
+# send_checkin_reminder emails the user when they have missed their check-in deadline
+# The email contains a one-click check-in link with an embedded token
 def send_checkin_reminder(user_name: str, user_email: str, checkin_url: str) -> None:
     html = _layout(f"""
 <h2 style="color:#1e293b;">Time to check in, {user_name}</h2>
@@ -46,15 +65,18 @@ def send_checkin_reminder(user_name: str, user_email: str, checkin_url: str) -> 
 <p style="margin:28px 0;">{_btn(checkin_url, "Check In Now")}</p>
 <p style="color:#94a3b8;font-size:13px;">If you did not set up this account, you can safely ignore this email.</p>
 """)
+    # Send the assembled HTML email to the user
     send_email(user_email, "LastKey — Please check in", html)
 
 
+# send_verifier_alert emails the trusted verifier when the user's grace period has expired
+# The email contains two action buttons: one to confirm incapacitation, one to deny it
 def send_verifier_alert(
-    verifier_name: str,
-    verifier_email: str,
-    user_name: str,
-    confirm_url: str,
-    deny_url: str,
+    verifier_name: str,    # The verifier's name — used in the email greeting
+    verifier_email: str,   # Where to send the email
+    user_name: str,        # The name of the user being verified
+    confirm_url: str,      # URL for the "confirm incapacitation" action (red button)
+    deny_url: str,         # URL for the "they are alive" action (green button)
 ) -> None:
     html = _layout(f"""
 <h2 style="color:#1e293b;">Verification request for {user_name}</h2>
@@ -73,15 +95,18 @@ def send_verifier_alert(
   To confirm, you will be asked to type the person's full name as a safety check.
 </p>
 """)
+    # Send the alert email to the verifier
     send_email(verifier_email, f"LastKey — Verification needed for {user_name}", html)
 
 
+# send_beneficiary_release emails a beneficiary to notify them that secrets have been released
+# The email contains their personal retrieval link (valid for 90 days)
 def send_beneficiary_release(
-    beneficiary_name: str,
-    beneficiary_email: str,
-    deceased_name: str,
-    retrieval_url: str,
-    secret_count: int,
+    beneficiary_name: str,   # The beneficiary's name for the greeting
+    beneficiary_email: str,  # Where to send the notification
+    deceased_name: str,      # The name of the person who passed away
+    retrieval_url: str,      # The beneficiary's unique URL to access their secrets
+    secret_count: int,       # How many secrets they are receiving
 ) -> None:
     html = _layout(f"""
 <h2 style="color:#dc2626;">Important notice regarding {deceased_name}</h2>
@@ -102,9 +127,12 @@ def send_beneficiary_release(
   This link will expire in 90 days. Please save the contents securely before then.
 </p>
 """)
+    # Send the release notification to the beneficiary
     send_email(beneficiary_email, f"LastKey — {deceased_name} has designated you as a beneficiary", html)
 
 
+# send_no_verifier_warning emails the user when their grace period expired but no verifier is set
+# Without a verifier the system cannot escalate, so this is an urgent warning to the user themselves
 def send_no_verifier_warning(user_name: str, user_email: str) -> None:
     html = _layout(f"""
 <h2 style="color:#dc2626;">Action required: No trusted verifier set</h2>
@@ -115,4 +143,5 @@ def send_no_verifier_warning(user_name: str, user_email: str) -> None:
 </p>
 <p style="color:#475569;">Please log in and add a trusted verifier as soon as possible.</p>
 """)
+    # Send the urgent warning to the user's own email address
     send_email(user_email, "LastKey — URGENT: No trusted verifier configured", html)

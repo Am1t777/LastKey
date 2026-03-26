@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LastKey — How It Works</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* ── Slide container ── */
+    .slides { width: 100%; height: 100vh; position: relative; }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+      text-align: center;
+    }
+    .slide.active { display: flex; }
+
+    /* ── Slide backgrounds ── */
+    .slide-title   { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+    .slide-problem { background: linear-gradient(135deg, #1c1917 0%, #0f172a 100%); }
+    .slide-what    { background: linear-gradient(135deg, #0c1a2e 0%, #0f172a 100%); }
+    .slide-arch    { background: linear-gradient(135deg, #0d1117 0%, #1e293b 100%); }
+    .slide-encrypt { background: linear-gradient(135deg, #160b1f 0%, #0f172a 100%); }
+    .slide-switch  { background: linear-gradient(135deg, #0c1a0c 0%, #0f172a 100%); }
+    .slide-stack   { background: linear-gradient(135deg, #1a1209 0%, #0f172a 100%); }
+    .slide-api     { background: linear-gradient(135deg, #0c1a2e 0%, #0f172a 100%); }
+    .slide-security{ background: linear-gradient(135deg, #1a0c0c 0%, #0f172a 100%); }
+    .slide-flow    { background: linear-gradient(135deg, #0c1a1a 0%, #0f172a 100%); }
+    .slide-end     { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+
+    /* ── Typography ── */
+    .eyebrow {
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 22px;
+      color: #94a3b8;
+      max-width: 680px;
+      line-height: 1.6;
+    }
+
+    /* ── Accent colours ── */
+    .accent-blue   { color: #38bdf8; }
+    .accent-purple { color: #c084fc; }
+    .accent-green  { color: #4ade80; }
+    .accent-orange { color: #fb923c; }
+    .accent-red    { color: #f87171; }
+
+    /* ── Cards ── */
+    .cards {
+      display: flex;
+      gap: 24px;
+      margin-top: 32px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 28px 24px;
+      width: 220px;
+      text-align: left;
+    }
+    .card .icon { font-size: 36px; margin-bottom: 12px; }
+    .card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .card p { font-size: 14px; color: #94a3b8; line-height: 1.5; }
+
+    /* ── List with big dots ── */
+    .big-list {
+      list-style: none;
+      margin-top: 28px;
+      max-width: 760px;
+      text-align: left;
+    }
+    .big-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 20px;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+    .big-list .dot {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    .dot-blue   { background: #1d4ed8; color: #fff; }
+    .dot-purple { background: #7c3aed; color: #fff; }
+    .dot-green  { background: #16a34a; color: #fff; }
+    .dot-orange { background: #ea580c; color: #fff; }
+    .dot-red    { background: #dc2626; color: #fff; }
+
+    /* ── State machine timeline ── */
+    .timeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 40px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .state {
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 18px 22px;
+      text-align: center;
+      min-width: 140px;
+    }
+    .state .icon { font-size: 28px; margin-bottom: 8px; }
+    .state .label { font-size: 14px; font-weight: 600; }
+    .state .desc { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .arrow {
+      font-size: 28px;
+      color: #475569;
+      padding: 0 8px;
+    }
+    .state.s-active   { border-color: #22c55e; }
+    .state.s-reminder { border-color: #f59e0b; }
+    .state.s-alert    { border-color: #f97316; }
+    .state.s-released { border-color: #ef4444; }
+
+    /* ── Code block ── */
+    .code-block {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 24px 28px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      text-align: left;
+      max-width: 700px;
+      margin-top: 24px;
+    }
+    .code-block .kw  { color: #c084fc; }
+    .code-block .fn  { color: #38bdf8; }
+    .code-block .str { color: #4ade80; }
+    .code-block .cm  { color: #475569; }
+
+    /* ── Tech stack badges ── */
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 32px;
+    }
+    .badge {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 999px;
+      padding: 10px 22px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    /* ── Navigation ── */
+    .nav {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      padding: 10px 20px;
+      backdrop-filter: blur(8px);
+    }
+    .nav button {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav button:hover { color: #fff; background: rgba(255,255,255,0.1); }
+    .nav button:disabled { opacity: 0.25; cursor: not-allowed; }
+    .nav .counter { font-size: 14px; color: #64748b; min-width: 60px; text-align: center; }
+
+    /* ── Progress bar ── */
+    #progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #38bdf8, #c084fc);
+      transition: width 0.3s;
+    }
+
+    /* ── Slide number ── */
+    .slide-num {
+      position: fixed;
+      top: 20px;
+      right: 28px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    /* ── Encryption flow diagram ── */
+    .enc-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 720px;
+      margin-top: 28px;
+      text-align: left;
+    }
+    .enc-step {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .enc-step .num {
+      background: #1d4ed8;
+      color: #fff;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .enc-step .text { font-size: 15px; line-height: 1.5; color: #cbd5e1; }
+    .enc-step .text strong { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+<div id="progress"></div>
+<div class="slide-num" id="slideNum">1 / 11</div>
+
+<div class="slides" id="slides">
+
+  <!-- ── SLIDE 1: Title ── -->
+  <div class="slide slide-title active">
+    <div class="eyebrow">Portfolio Project</div>
+    <h1>🔐 <span class="accent-blue">LastKey</span></h1>
+    <p class="subtitle">A <strong>Digital Inheritance Vault</strong> — store your most important secrets encrypted, and have them automatically delivered to your loved ones if something happens to you.</p>
+    <div style="margin-top:48px; display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+      <span class="badge">Python · FastAPI</span>
+      <span class="badge">React</span>
+      <span class="badge">AES-256-GCM</span>
+      <span class="badge">RSA-2048</span>
+      <span class="badge">Argon2id</span>
+    </div>
+  </div>
+
+  <!-- ── SLIDE 2: The Problem ── -->
+  <div class="slide slide-problem">
+    <div class="eyebrow">Why does this exist?</div>
+    <h2>😢 What happens to your <span class="accent-red">digital life</span> when you're gone?</h2>
+    <ul class="big-list">
+      <li>
+        <span class="dot dot-red">1</span>
+        <span>Your bank passwords, crypto keys, and important documents are locked away in your head — no one can access them after you're gone.</span>
+      </li>
+      <li>
+        <span class="dot dot-orange">2</span>
+        <span>Storing passwords in a shared note or email is insecure — anyone who sees it now has full access.</span>
+      </li>
+      <li>
+        <span class="dot dot-purple">3</span>
+        <span>You need a system that <em>waits</em> until the right moment — only releasing secrets <strong>after</strong> it's truly necessary.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── SLIDE 3: What Is LastKey ── -->
+  <div class="slide slide-what">
+    <div class="eyebrow">The solution</div>
+    <h2>What is <span class="accent-blue">LastKey</span>?</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="icon">🔒</div>
+        <h3>Store Secrets</h3>
+        <p>Encrypt passwords, notes, and documents. Only you can read them while you're alive.</p>
+      </div>
+      <div class="card">
+        <div class="icon">👥</div>
+        <h3>Name Beneficiaries</h3>
+        <p>Choose who should receive each secret — each gets their own RSA encryption key.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🧑‍⚖️</div>
+        <h3>Trusted Verifier</h3>
+        <p>One person you trust confirms the situation before anything is released.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⏰</div>
+        <h3>Dead Man's Switch</h3>
+        <p>A regular check-in keeps the system quiet. Miss too many and it escalates automatically.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SLIDE 4: Architecture ── -->
+  <div class="slide slide-arch">
+    <div class="eyebrow">System design</div>
+    <h2>🏗️ <span class="accent-blue">Architecture</span> Overview</h2>
+    <div class="cards" style="margin-top:24px;">
+      <div class="card" style="width:180px;">
+        <div class="icon">⚛️</div>
+        <h3>React Frontend</h3>
+        <p>All decryption happens in the browser using the Web Crypto API.</p>
+      </div>
+      <div class="card" style="width:180px; font-size:32px; display:flex; align-items:center; justify-content:center; border:none; background:none;">➜</div>
+      <div class="card" style="width:180px;">
+        <div class="icon">⚡</div>
+        <h3>FastAPI Backend</h3>
+        <p>REST API with JWT auth, rate limiting, CSRF protection, and security headers.</p>
+      </div>
+      <div class="card" style="width:180px; font-size:32px; display:flex; align-items:center; justify-content:center; border:none; background:none;">➜</div>
+      <div class="card" style="width:180px;">
+        <div class="icon">🗄️</div>
+        <h3>PostgreSQL</h3>
+        <p>All data stored with SQLAlchemy ORM. Alembic handles migrations.</p>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top:28px; font-size:16px;">The server <strong>never sees plaintext</strong>. Encryption happens in the browser before sending data to the API.</p>
+  </div>
+
+  <!-- ── SLIDE 5: Encryption ── -->
+  <div class="slide slide-encrypt">
+    <div class="eyebrow">Zero-knowledge security</div>
+    <h2>🔐 How <span class="accent-purple">Encryption</span> Works</h2>
+    <div class="enc-flow">
+      <div class="enc-step">
+        <div class="num">1</div>
+        <div class="text">A <strong>random AES-256 key</strong> is generated uniquely for each secret you store.</div>
+      </div>
+      <div class="enc-step">
+        <div class="num">2</div>
+        <div class="text">Your secret content is encrypted with that AES key using <strong>AES-256-GCM</strong> (authenticated encryption).</div>
+      </div>
+      <div class="enc-step">
+        <div class="num">3</div>
+        <div class="text">The AES key itself is encrypted using a key derived from <strong>your password + Argon2id</strong> — stored as <em>owner_encrypted_key</em>.</div>
+      </div>
+      <div class="enc-step">
+        <div class="num">4</div>
+        <div class="text">For each beneficiary, the AES key is re-encrypted with their <strong>RSA-2048 public key</strong> — stored in <em>secret_assignments</em>.</div>
+      </div>
+      <div class="enc-step">
+        <div class="num">5</div>
+        <div class="text">To read a secret: your password unlocks the AES key → AES key decrypts the content. <strong>Server never touches plaintext.</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SLIDE 6: Dead Man's Switch ── -->
+  <div class="slide slide-switch">
+    <div class="eyebrow">The core feature</div>
+    <h2>⏰ The <span class="accent-green">Dead Man's Switch</span></h2>
+    <div class="timeline">
+      <div class="state s-active">
+        <div class="icon">✅</div>
+        <div class="label">Active</div>
+        <div class="desc">Checking in regularly</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="state s-reminder">
+        <div class="icon">📧</div>
+        <div class="label">Reminder Sent</div>
+        <div class="desc">Missed deadline — email sent</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="state s-alert">
+        <div class="icon">🚨</div>
+        <div class="label">Verifier Alerted</div>
+        <div class="desc">Grace period expired</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="state s-released">
+        <div class="icon">🔓</div>
+        <div class="label">Released</div>
+        <div class="desc">Verifier confirmed</div>
+      </div>
+    </div>
+    <ul class="big-list" style="margin-top:32px;">
+      <li><span class="dot dot-green">✓</span> <span>The user checks in periodically (e.g., every 30 days) by clicking a link in an email.</span></li>
+      <li><span class="dot dot-orange">!</span> <span>Missing a deadline triggers a 7-day grace period with an email reminder.</span></li>
+      <li><span class="dot dot-red">✕</span> <span>After the grace period, the trusted verifier is contacted. They either <em>confirm</em> (release) or <em>deny</em> (reset).</span></li>
+    </ul>
+  </div>
+
+  <!-- ── SLIDE 7: Tech Stack ── -->
+  <div class="slide slide-stack">
+    <div class="eyebrow">Built with</div>
+    <h2>🛠️ <span class="accent-orange">Tech Stack</span></h2>
+    <div class="cards" style="margin-top:24px;">
+      <div class="card">
+        <div class="icon">🐍</div>
+        <h3>Python + FastAPI</h3>
+        <p>High-performance async REST API with automatic OpenAPI documentation.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚛️</div>
+        <h3>React + Vite</h3>
+        <p>Fast frontend with TanStack Query for server state and shadcn/ui components.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🗄️</div>
+        <h3>SQLAlchemy + Alembic</h3>
+        <p>ORM for safe parameterized queries. Migration files track schema changes.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔑</div>
+        <h3>JWT + bcrypt</h3>
+        <p>Stateless authentication with HS256 tokens. Passwords hashed with bcrypt.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⏱️</div>
+        <h3>APScheduler</h3>
+        <p>Background cron job runs every night at 2am UTC to check all user deadlines.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📧</div>
+        <h3>SMTP</h3>
+        <p>HTML email templates for check-in reminders, verifier alerts, and release notices.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SLIDE 8: API Routes ── -->
+  <div class="slide slide-api">
+    <div class="eyebrow">REST API</div>
+    <h2>🗺️ <span class="accent-blue">API Routes</span></h2>
+    <div class="cards" style="gap:16px; margin-top:24px;">
+      <div class="card" style="width:200px;">
+        <div class="icon">🔐</div>
+        <h3>/api/auth/*</h3>
+        <p>Register, login, logout, get current user profile</p>
+      </div>
+      <div class="card" style="width:200px;">
+        <div class="icon">🗝️</div>
+        <h3>/api/secrets/*</h3>
+        <p>Create, read, update, delete encrypted secrets. Assign to beneficiaries.</p>
+      </div>
+      <div class="card" style="width:200px;">
+        <div class="icon">👥</div>
+        <h3>/api/beneficiaries/*</h3>
+        <p>Manage beneficiaries. Generate RSA keys. List assigned secrets.</p>
+      </div>
+      <div class="card" style="width:200px;">
+        <div class="icon">🧑‍⚖️</div>
+        <h3>/api/verifier/*</h3>
+        <p>Set / get / delete trusted verifier</p>
+      </div>
+      <div class="card" style="width:200px;">
+        <div class="icon">✅</div>
+        <h3>/api/checkin/*</h3>
+        <p>Token-based and authenticated check-in endpoints</p>
+      </div>
+      <div class="card" style="width:200px;">
+        <div class="icon">🔓</div>
+        <h3>/api/release/*</h3>
+        <p>Beneficiary retrieves their inherited secrets via one-time token</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SLIDE 9: Security ── -->
+  <div class="slide slide-security">
+    <div class="eyebrow">Security features</div>
+    <h2>🛡️ <span class="accent-red">Security</span> Layers</h2>
+    <div class="cards" style="margin-top:24px;">
+      <div class="card">
+        <div class="icon">🚫</div>
+        <h3>Rate Limiting</h3>
+        <p>5 attempts/min on auth. 10/min on verifier confirm/deny. Powered by slowapi.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🌐</div>
+        <h3>CORS</h3>
+        <p>Only the configured frontend origin can make cross-origin API requests.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🪙</div>
+        <h3>CSRF Protection</h3>
+        <p>All state-changing requests must include X-Requested-With header.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔒</div>
+        <h3>Security Headers</h3>
+        <p>HSTS, X-Frame-Options: DENY, CSP, X-Content-Type-Options, Referrer-Policy.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📋</div>
+        <h3>Audit Logging</h3>
+        <p>Every sensitive action logged with user ID, action name, IP, and timestamp.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔑</div>
+        <h3>Zero Knowledge</h3>
+        <p>Server stores only ciphertext. Passwords and plaintext never leave the browser.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SLIDE 10: Full User Flow ── -->
+  <div class="slide slide-flow">
+    <div class="eyebrow">End-to-end user journey</div>
+    <h2>🚀 Full <span class="accent-green">User Flow</span></h2>
+    <ul class="big-list">
+      <li>
+        <span class="dot dot-blue">1</span>
+        <span><strong>Register & log in.</strong> JWT token is issued. Check-in timer starts.</span>
+      </li>
+      <li>
+        <span class="dot dot-blue">2</span>
+        <span><strong>Add beneficiaries.</strong> Generate an RSA key pair per beneficiary. Give them the private key.</span>
+      </li>
+      <li>
+        <span class="dot dot-purple">3</span>
+        <span><strong>Store secrets.</strong> Enter title + content + your password. Content is AES-encrypted in the browser before upload.</span>
+      </li>
+      <li>
+        <span class="dot dot-purple">4</span>
+        <span><strong>Assign secrets.</strong> Enter your password again to re-encrypt the AES key for each beneficiary's RSA key.</span>
+      </li>
+      <li>
+        <span class="dot dot-orange">5</span>
+        <span><strong>Set a trusted verifier.</strong> Add the name + email of someone you trust to verify your status.</span>
+      </li>
+      <li>
+        <span class="dot dot-green">6</span>
+        <span><strong>Keep checking in.</strong> Click the link in the reminder email every 30 days (or your chosen interval).</span>
+      </li>
+      <li>
+        <span class="dot dot-red">7</span>
+        <span><strong>If the switch fires:</strong> verifier clicks confirm → beneficiaries get an email with a personal link → they paste their private key → secrets decrypted in browser.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── SLIDE 11: End ── -->
+  <div class="slide slide-end">
+    <div class="eyebrow">Thanks for watching</div>
+    <h1>🔐 <span class="accent-blue">LastKey</span></h1>
+    <p class="subtitle" style="margin-top:16px;">
+      A zero-knowledge digital inheritance vault built with<br>
+      <span class="accent-blue">FastAPI</span> · <span class="accent-purple">React</span> · <span class="accent-green">AES-256-GCM</span> · <span class="accent-orange">RSA-2048</span> · <span class="accent-red">Argon2id</span>
+    </p>
+    <div class="code-block" style="margin-top:40px;">
+      <span class="cm"># Run the backend</span><br>
+      <span class="kw">cd</span> backend && uvicorn app.main:app --reload<br><br>
+      <span class="cm"># Run the frontend</span><br>
+      <span class="kw">cd</span> frontend && npm start
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Navigation ── -->
+<nav class="nav">
+  <button id="prevBtn" onclick="changeSlide(-1)" disabled>←</button>
+  <span class="counter" id="counter">1 / 11</span>
+  <button id="nextBtn" onclick="changeSlide(1)">→</button>
+</nav>
+
+<script>
+  const slides = document.querySelectorAll('.slide')
+  const total = slides.length
+  let current = 0
+
+  function changeSlide(dir) {
+    slides[current].classList.remove('active')
+    current = Math.max(0, Math.min(total - 1, current + dir))
+    slides[current].classList.add('active')
+    document.getElementById('counter').textContent = `${current + 1} / ${total}`
+    document.getElementById('slideNum').textContent = `${current + 1} / ${total}`
+    document.getElementById('prevBtn').disabled = current === 0
+    document.getElementById('nextBtn').disabled = current === total - 1
+    document.getElementById('progress').style.width = `${((current + 1) / total) * 100}%`
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') changeSlide(1)
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                     changeSlide(-1)
+  })
+
+  // Initialize progress bar
+  changeSlide(0)
+</script>
+
+</body>
+</html>
